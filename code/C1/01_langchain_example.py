@@ -17,7 +17,7 @@ markdown_path = "../../data/C1/markdown/easy-rl-chapter1.md"
 loader = UnstructuredMarkdownLoader(markdown_path)
 docs = loader.load()
 
-# 文本分块
+# 文本分块 采用递归字符分割策略
 text_splitter = RecursiveCharacterTextSplitter()
 chunks = text_splitter.split_documents(docs)
 
@@ -27,10 +27,18 @@ embeddings = HuggingFaceEmbeddings(
     model_kwargs={'device': 'cpu'},
     encode_kwargs={'normalize_embeddings': True}
 )
-  
+
 # 构建向量存储
 vectorstore = InMemoryVectorStore(embeddings)
+# 将分割好的文本块通过嵌入模型转换未向量表示并且存到向量库中
 vectorstore.add_documents(chunks)
+
+# 用户查询
+question = "文中举了哪些例子？"
+
+# 在向量存储中查询相关文档
+retrieved_docs = vectorstore.similarity_search(question, k=3)
+docs_content = "\n\n".join(doc.page_content for doc in retrieved_docs)
 
 # 提示词模板
 prompt = ChatPromptTemplate.from_template("""请根据下面提供的上下文信息来回答问题。
@@ -52,7 +60,7 @@ llm = ChatOpenAI(
     model="glm-4.7-flash-free",
     temperature=0.7,
     max_tokens=4096,
-    api_key=os.getenv("DEEPSEEK_API_KEY"),
+    api_key=os.getenv("AIHUBMIX_API_KEY"),
     base_url="https://aihubmix.com/v1"
 )
 
@@ -64,12 +72,9 @@ llm = ChatOpenAI(
 #     base_url="https://api.deepseek.com"
 # )
 
-# 用户查询
-question = "文中举了哪些例子？"
 
-# 在向量存储中查询相关文档
-retrieved_docs = vectorstore.similarity_search(question, k=3)
-docs_content = "\n\n".join(doc.page_content for doc in retrieved_docs)
 
 answer = llm.invoke(prompt.format(question=question, context=docs_content))
-print(answer)
+#print(answer)
+
+print(answer.content)
